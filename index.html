@@ -330,7 +330,52 @@
         }
 
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-   </style>
+  /* --- INSTALL PROMPT MODAL --- */
+.pwa-modal-overlay {
+    position: fixed; inset: 0; 
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    z-index: 11000; /* Highest layer */
+    display: none; justify-content: center; align-items: flex-end;
+    opacity: 0; transition: opacity 0.3s;
+}
+.pwa-modal-overlay.active { opacity: 1; }
+
+.pwa-card {
+    background: var(--card-bg);
+    width: 100%; max-width: 500px;
+    margin: 20px;
+    padding: 30px; border-radius: 30px;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+    border: 1px solid var(--glass-border);
+    transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.pwa-modal-overlay.active .pwa-card { transform: translateY(0); }
+
+.pwa-icon-area { font-size: 4rem; margin-bottom: 10px; animation: bounce 2s infinite; }
+.pwa-title { font-family: var(--font-head); font-size: 2rem; margin: 10px 0; }
+.pwa-desc { opacity: 0.8; margin-bottom: 25px; font-size: 1.1rem; }
+
+.btn-group { display: flex; gap: 10px; margin-top: 10px; }
+.btn-install { 
+    flex: 2; background: var(--accent); color: white; border: none; 
+    padding: 15px; border-radius: 15px; font-weight: 800; font-size: 1.2rem;
+    box-shadow: 0 4px 15px rgba(255, 71, 87, 0.4);
+}
+.btn-later { 
+    flex: 1; background: transparent; border: 2px solid var(--glass-border); 
+    color: var(--text-main); padding: 15px; border-radius: 15px; font-weight: 800; 
+}
+@keyframes bounce { 0%, 100% {transform: translateY(0);} 50% {transform: translateY(-10px);} }
+
+/* iOS Specific Instructions */
+.ios-instructions {
+    background: rgba(0,0,0,0.05); padding: 15px; border-radius: 15px;
+    margin-top: 15px; text-align: left; font-size: 0.95rem; display: none;
+}
+.ios-icon { vertical-align: middle; font-size: 1.2rem; }
+ </style>
 </head>
 <body>
     <div id="curtain">LOADING...</div>
@@ -344,7 +389,7 @@
     </audio>
 
     <div id="splash" onclick="enterApp()">
-        <div class="splash-title">ULTIMATE</div>
+        <div class="splash-title">Super kid</div>
         <div class="tap-msg" id="splash-txt">TAP TO START</div>
     </div>
 
@@ -410,8 +455,87 @@
             <button id="btn-claim" class="btn-primary" onclick="claimReward()">CLAIM!</button>
         </div>
     </div>
+<div class="pwa-modal-overlay" id="install-modal">
+    <div class="pwa-card">
+        <div class="pwa-icon-area">🚀</div>
+        <div class="pwa-title">INSTALL APP</div>
+        <div class="pwa-desc">Install <b>Super Tube Ultimate</b> for the best full-screen experience and offline play!</div>
+        
+        <div class="btn-group" id="install-btns">
+            <button class="btn-later" onclick="closeInstall()">LATER</button>
+            <button class="btn-install" onclick="triggerInstall()">INSTALL NOW</button>
+        </div>
+
+        <div class="ios-instructions" id="ios-steps">
+            To install on iOS:<br>
+            1. Tap the <b>Share</b> button <span class="ios-icon">⎋</span><br>
+            2. Scroll down and tap <b>"Add to Home Screen"</b> <span class="ios-icon">➕</span>
+            <button class="btn-later" onclick="closeInstall()" style="width:100%; margin-top:10px;">GOT IT</button>
+        </div>
+    </div>
+</div>
 
     <script src="game-engine.js"></script>
     <script src="launcher.js"></script>
+    <script>// --- PWA LOGIC ---
+let deferredPrompt;
+const installModal = document.getElementById('install-modal');
+const iosSteps = document.getElementById('ios-steps');
+const installBtns = document.getElementById('install-btns');
+
+// 1. Register Service Worker
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('SW Registered'))
+            .catch(err => console.log('SW Error', err));
+    });
+}
+
+// 2. Detect Installation Eligibility
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    // Show modal automatically if not installed
+    if(!localStorage.getItem('installDeclined')) {
+        setTimeout(() => openInstall(), 3000); // Wait 3s before showing
+    }
+});
+
+// 3. Detect iOS
+const isIos = /iPhone|iPad|iPod/.test(navigator.userAgent) && !window.MSStream;
+const isInstalled = window.matchMedia('(display-mode: standalone)').matches;
+
+if (isIos && !isInstalled && !localStorage.getItem('installDeclined')) {
+    setTimeout(() => {
+        openInstall();
+        iosSteps.style.display = 'block';
+        installBtns.style.display = 'none';
+    }, 3000);
+}
+
+function openInstall() {
+    installModal.style.display = 'flex';
+    // Small delay to allow display:flex to apply before adding opacity class for animation
+    setTimeout(() => installModal.classList.add('active'), 10);
+}
+
+function closeInstall() {
+    installModal.classList.remove('active');
+    setTimeout(() => installModal.style.display = 'none', 300);
+    localStorage.setItem('installDeclined', 'true'); // Remember user choice
+}
+
+async function triggerInstall() {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+            deferredPrompt = null;
+        }
+        closeInstall();
+    }
+}
+</script>
 </body>
 </html>

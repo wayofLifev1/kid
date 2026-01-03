@@ -272,27 +272,65 @@ function mascotTalk() {
     setTimeout(() => { bubble.classList.remove('show'); char.style.transform = "scale(1)"; }, 2000);
 }
 
+// --- NEW MUSICAL SFX ENGINE ---
 function sfx(type) {
-    if(CONFIG.muted) return;
+    if (CONFIG.muted) return;
     const now = audioCtx.currentTime;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain); gain.connect(audioCtx.destination);
-    
-    if(type === 'click') {
-        osc.frequency.setValueAtTime(600, now); osc.frequency.exponentialRampToValueAtTime(300, now+0.1);
-        gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0, now+0.1);
-        osc.start(now); osc.stop(now+0.1);
-    } else if(type === 'success' || type === 'intro') {
-        osc.type = 'triangle'; osc.frequency.setValueAtTime(400, now); osc.frequency.linearRampToValueAtTime(800, now+0.1);
-        gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0, now+0.3);
-        osc.start(now); osc.stop(now+0.3);
-    } else if(type === 'pop') {
-        osc.frequency.setValueAtTime(800, now); osc.frequency.exponentialRampToValueAtTime(1200, now+0.1);
-        gain.gain.setValueAtTime(0.05, now); gain.gain.linearRampToValueAtTime(0, now+0.1);
-        osc.start(now); osc.stop(now+0.1);
+
+    // Helper to play a single musical note
+    // types: 'sine' (soft), 'triangle' (gamey), 'square' (retro)
+    const playNote = (freq, waveType, duration, delay = 0, vol = 0.1) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        
+        osc.type = waveType;
+        osc.frequency.setValueAtTime(freq, now + delay);
+        
+        // "Envelope" to make it sound soft instead of a harsh beep
+        gain.gain.setValueAtTime(0, now + delay);
+        gain.gain.linearRampToValueAtTime(vol, now + delay + 0.02); // Attack
+        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + duration); // Release
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        osc.start(now + delay);
+        osc.stop(now + delay + duration);
+    };
+
+    if (type === 'click') {
+        // A soft "Woodblock" tap (High pitch, very short)
+        playNote(800, 'sine', 0.1, 0, 0.1);
+    } 
+    else if (type === 'pop') {
+        // A "Bubble" sound (Two notes close together)
+        playNote(400, 'sine', 0.15, 0, 0.1);
+        playNote(600, 'sine', 0.1, 0.05, 0.1);
+    } 
+    else if (type === 'success') {
+        // A "Magic Wand" Arpeggio (C Major Chord: C -> E -> G)
+        playNote(523.25, 'triangle', 0.4, 0, 0.08);    // C5
+        playNote(659.25, 'triangle', 0.4, 0.1, 0.08);  // E5
+        playNote(783.99, 'triangle', 0.6, 0.2, 0.08);  // G5
+        playNote(1046.50, 'sine', 0.8, 0.3, 0.05);     // C6 (Sparkle on top)
+    } 
+    else if (type === 'intro') {
+        // A "Power Up" Slide
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'square';
+        // Slide frequency up from 220Hz to 880Hz
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.4);
+        
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.4);
+        
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(now); osc.stop(now + 0.4);
     }
 }
+
 
 // --- CLOCK & MODALS ---
 function startClock() {
